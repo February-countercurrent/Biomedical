@@ -1,0 +1,12 @@
+# PyCharm project settings
+.idea/
+
+# Python bytecode cache
+__pycache__/
+
+# Experiment or run results
+runs/
+
+# Data directories
+Data/
+PreparedData/
