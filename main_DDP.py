@@ -192,6 +192,7 @@ def main(rank, world_size):
 
     cleanup()
 
+# 使用这条命令python -m torch.distributed.launch main_DDP.py
 if __name__ == '__main__':
     world_size = torch.cuda.device_count()
     mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)
