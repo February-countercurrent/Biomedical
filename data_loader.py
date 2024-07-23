@@ -9,11 +9,11 @@ from scipy.ndimage import zoom
 def load_nifti(file_path):
     img = nib.load(file_path)
     data = img.get_fdata()
-    return data.astype(np.float32)  # 变更数据类型为 float32
+    return data.astype(np.float32)  # float32
 
 def resample(image, target_shape):
     factors = [t / s for t, s in zip(target_shape, image.shape)]
-    return zoom(image, factors, order=1)  # 线性插值
+    return zoom(image, factors, order=1)  # Linear interpolation
 
 class BrainLesionDataset(Dataset):
     def __init__(self, t1_files, demographics_file, target_shape=(128, 128, 128)):
@@ -31,8 +31,8 @@ class BrainLesionDataset(Dataset):
         rand_id = os.path.basename(t1_file).split('_')[1]
 
         t1_data = load_nifti(t1_file)
-        t1_data = (t1_data - np.min(t1_data)) / (np.max(t1_data) - np.min(t1_data))  # 归一化
-        t1_data = resample(t1_data, self.target_shape)  # 重新采样
+        t1_data = (t1_data - np.min(t1_data)) / (np.max(t1_data) - np.min(t1_data))
+        t1_data = resample(t1_data, self.target_shape)
 
         demographics_info = self.demographics_data.loc[rand_id]
         extra_features = torch.tensor(demographics_info[['Age', 'Sex', 'TSI']].values.astype(np.float32), dtype=torch.float32)

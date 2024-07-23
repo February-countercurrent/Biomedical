@@ -10,13 +10,12 @@ import matplotlib.pyplot as plt
 from model import UNet
 from data_loader import load_nifti, resample
 
-# 设置设备
+# cuda
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
 
 def remove_module_prefix(state_dict):
-    """移除state_dict中键的'module.'前缀"""
     new_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith("module."):
@@ -25,7 +24,7 @@ def remove_module_prefix(state_dict):
     return new_state_dict
 
 
-# 加载模型
+# Load the model
 print("Loading model...")
 model = UNet().to(device)
 checkpoint = torch.load('result/new/final_model.pth', map_location=device)
@@ -36,7 +35,7 @@ model.eval()
 print("Model loaded.")
 
 
-# 预处理T1图像
+# Preprocess T1 image
 def load_and_preprocess_image(nifti_path):
     if not os.path.exists(nifti_path):
         print(f"File not found: {nifti_path}")
@@ -48,13 +47,12 @@ def load_and_preprocess_image(nifti_path):
     return t1_tensor.to(device)
 
 
-# 预处理人口统计信息
 def load_and_preprocess_features(age, sex, tsi):
     extra_features = torch.tensor([age, sex, tsi], dtype=torch.float32).unsqueeze(0)  # 转换为二维张量，形状为 (1, num_features)
     return extra_features.to(device)
 
 
-# 预测是否存在病灶
+# Lesion predict
 def predict_lesion(nifti_path, age, sex, tsi, threshold=1e-3):
     t1_tensor = load_and_preprocess_image(nifti_path)
     if t1_tensor is None:
@@ -70,17 +68,14 @@ def predict_lesion(nifti_path, age, sex, tsi, threshold=1e-3):
 
 
 def evaluate_model(test_data_path, demographics_path, threshold=1e-3):
-    # 加载测试集人口统计数据
     test_demographics = pd.read_csv(demographics_path)
 
-    # 打印列名和所有ID以检查实际的列名和ID格式
     print("Columns in the CSV file:", test_demographics.columns)
     print("RandID values in the CSV file:", test_demographics['RandID'].tolist())
 
     y_true = []
     y_pred = []
 
-    # 遍历test_data_path目录中的所有文件
     for file_name in os.listdir(test_data_path):
         if not file_name.endswith('_T1.nii.gz'):
             continue
@@ -101,7 +96,7 @@ def evaluate_model(test_data_path, demographics_path, threshold=1e-3):
 
         has_lesion, _ = predict_lesion(nifti_path, age, sex, tsi, threshold)
 
-        # 设置真实标签，使用Excel中的标注
+        # Use label
         y_true.append(lesion)
         y_pred.append(int(has_lesion))
         print(f"ID: {file_id_full}, Predicted Lesion: {has_lesion}")
@@ -110,7 +105,6 @@ def evaluate_model(test_data_path, demographics_path, threshold=1e-3):
         print("No predictions were made. Exiting.")
         return None
 
-    # 计算评估指标
     accuracy = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred, zero_division=0)
     recall = recall_score(y_true, y_pred, zero_division=0)

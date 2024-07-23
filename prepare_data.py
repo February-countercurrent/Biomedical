@@ -13,7 +13,7 @@ def prepare_data(data_dir, output_dir, test_size=0.2):
     train_files = t1_files[:split_idx]
     val_files = t1_files[split_idx:]
 
-    # 创建输出文件夹
+    # Create the file
     train_t1_dir = os.path.join(output_dir, "train", "T1")
     train_lesion_dir = os.path.join(output_dir, "train", "Lesion")
     val_t1_dir = os.path.join(output_dir, "val", "T1")
@@ -24,7 +24,7 @@ def prepare_data(data_dir, output_dir, test_size=0.2):
     os.makedirs(val_t1_dir, exist_ok=True)
     os.makedirs(val_lesion_dir, exist_ok=True)
 
-    # 将文件复制到相应的文件夹
+    # Copy
     for file_name in train_files:
         shutil.copy(os.path.join(t1_dir, file_name), os.path.join(train_t1_dir, file_name))
         rand_id = file_name.split('_')[1]
@@ -37,7 +37,7 @@ def prepare_data(data_dir, output_dir, test_size=0.2):
         lesion_file = f"scan_{rand_id}_Lesion.nii.gz"
         shutil.copy(os.path.join(lesion_dir, lesion_file), os.path.join(val_lesion_dir, lesion_file))
 
-    # 保存验证集文件名
+    # Save txt file
     with open(os.path.join(output_dir, 'validation_files.txt'), 'w') as f:
         for file_name in val_files:
             f.write(f"{file_name}\n")

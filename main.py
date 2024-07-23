@@ -10,7 +10,6 @@ from tqdm import tqdm
 import logging
 import pandas as pd
 
-# 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class BrainLesionDataset(Dataset):
@@ -29,10 +28,10 @@ class BrainLesionDataset(Dataset):
         t1_data = load_nifti(t1_file)
         lesion_data = load_nifti(lesion_file)
 
-        # 归一化 T1 数据
+        # Normalization
         t1_data = (t1_data - np.min(t1_data)) / (np.max(t1_data) - np.min(t1_data))
 
-        # 重新采样 T1 和病灶数据
+        # Reshape
         t1_data = resample(t1_data, (256, 256, 256))
         lesion_data = resample(lesion_data, (256, 256, 256))
 
@@ -42,7 +41,7 @@ class BrainLesionDataset(Dataset):
         demographics_data.set_index('RandID', inplace=True)
         demographics_info = demographics_data.loc[rand_id]
 
-        # 确保人口统计信息是数值类型
+
         extra_features = torch.tensor(demographics_info[['Age', 'Sex', 'TSI']].values.astype(np.float32), dtype=torch.float32)
 
         return torch.tensor(t1_data, dtype=torch.float32).unsqueeze(0), \
@@ -122,24 +121,20 @@ def train_model(model, criterion, optimizer, train_loader, val_loader, num_epoch
 
         print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss/len(train_loader)}, Val Loss: {val_loss/len(val_loader)}")
 
-        # 保存检查点
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict(),
         }, checkpoint_file)
 
-    # 保存最终模型
     torch.save(model.state_dict(), 'final_model.pth')
     print('Model saved as final_model.pth')
 
 def main():
-    # 获取当前工作目录
     current_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.abspath(os.path.join(current_dir, "PreparedData"))
     demographics_file = os.path.join(data_dir, '../Data/TestSet_demographics.xlsx')
 
-    # 检查路径是否正确
     print(f"Current directory: {current_dir}")
     print(f"Data directory: {data_dir}")
     print(f"Demographics file: {demographics_file}")
@@ -149,25 +144,24 @@ def main():
     if not os.path.exists(demographics_file):
         raise FileNotFoundError(f"Demographics file not found: {demographics_file}")
 
-    # 检查是否有可用的GPU
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device: {device}')
 
-    # 初始化模型
+
     model = UNet().to(device)
     logging.info(model)
 
-    # 定义损失函数和优化器
+    # Loss function
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     batch_size = 1
     num_epochs = 2
 
-    # 加载预先划分的数据
     train_loader, val_loader = load_data(data_dir, demographics_file, batch_size)
 
-    # 训练模型
+    # Train
     train_model(model, criterion, optimizer, train_loader, val_loader, num_epochs, device=device, checkpoint_file='checkpoint.pth.tar')
 
 if __name__ == '__main__':

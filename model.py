@@ -98,7 +98,7 @@ class UNet(nn.Module):
         bottleneck = self.pool4(enc7)
         bottleneck = self.bottleneck(bottleneck)
 
-        # 解码路径
+        # Decode
         dec4 = self.upconv4(bottleneck)
         dec4 = torch.cat((dec4, enc7), dim=1)
         dec4 = self.dec_conv4(dec4)
@@ -115,7 +115,7 @@ class UNet(nn.Module):
         dec1 = torch.cat((dec1, enc1), dim=1)
         dec1 = self.dec_conv1(dec1)
 
-        # 处理额外特征
+        #  Add extra features
         extra_out = self.extra_features_fc(extra_features)
         extra_out = extra_out.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
         extra_out = extra_out.expand(dec1.size(0), -1, dec1.size(2), dec1.size(3), dec1.size(4))
@@ -123,5 +123,5 @@ class UNet(nn.Module):
         combined = dec1 + extra_out
 
         output = self.final_conv(combined)
-        output = self.sigmoid(output)  # 应用Sigmoid激活函数
+        output = self.sigmoid(output)
         return output
