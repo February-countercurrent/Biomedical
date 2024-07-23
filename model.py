@@ -84,6 +84,7 @@ class UNet(nn.Module):
         )
 
         self.final_conv = nn.Conv3d(32, 1, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()  # 添加Sigmoid激活函数
 
     def forward(self, x, extra_features):
         # 编码路径
@@ -117,9 +118,10 @@ class UNet(nn.Module):
         # 处理额外特征
         extra_out = self.extra_features_fc(extra_features)
         extra_out = extra_out.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-        extra_out = extra_out.expand(-1, -1, dec1.size(2), dec1.size(3), dec1.size(4))
+        extra_out = extra_out.expand(dec1.size(0), -1, dec1.size(2), dec1.size(3), dec1.size(4))
 
         combined = dec1 + extra_out
 
         output = self.final_conv(combined)
+        output = self.sigmoid(output)  # 应用Sigmoid激活函数
         return output

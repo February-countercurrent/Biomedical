@@ -162,7 +162,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     batch_size = 1
-    num_epochs = 5
+    num_epochs = 2
 
     # 加载预先划分的数据
     train_loader, val_loader = load_data(data_dir, demographics_file, batch_size)

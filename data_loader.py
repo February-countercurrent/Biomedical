@@ -3,6 +3,7 @@ import nibabel as nib
 import numpy as np
 import pandas as pd
 import torch
+from torch.utils.data import Dataset, DataLoader
 from scipy.ndimage import zoom
 
 def load_nifti(file_path):
@@ -14,52 +15,42 @@ def resample(image, target_shape):
     factors = [t / s for t, s in zip(target_shape, image.shape)]
     return zoom(image, factors, order=1)  # 线性插值
 
-def load_data_generator(data_dir, demographics_file, target_shape=(256, 256, 256), batch_size=2):
-    t1_dir = os.path.join(data_dir, "T1")
-    lesion_dir = os.path.join(data_dir, "Lesion")
+class BrainLesionDataset(Dataset):
+    def __init__(self, t1_files, demographics_file, target_shape=(128, 128, 128)):
+        self.t1_files = t1_files
+        self.target_shape = target_shape
+        self.demographics_data = pd.read_csv(demographics_file)
+        self.demographics_data['RandID'] = self.demographics_data['RandID'].str.replace('scan_', '')
+        self.demographics_data.set_index('RandID', inplace=True)
 
-    # 加载人口统计信息
-    demographics_data = pd.read_excel(demographics_file)
-    demographics_data['RandID'] = demographics_data['RandID'].str.replace('scan_', '')
-    demographics_data.set_index('RandID', inplace=True)
+    def __len__(self):
+        return len(self.t1_files)
 
-    # 获取所有 T1 文件名
-    t1_files = [f for f in os.listdir(t1_dir) if f.endswith(".nii.gz")]
+    def __getitem__(self, idx):
+        t1_file = self.t1_files[idx]
+        rand_id = os.path.basename(t1_file).split('_')[1]
 
-    for i in range(0, len(t1_files), batch_size):
-        t1_images = []
-        lesion_masks = []
-        extra_features = []
+        t1_data = load_nifti(t1_file)
+        t1_data = (t1_data - np.min(t1_data)) / (np.max(t1_data) - np.min(t1_data))  # 归一化
+        t1_data = resample(t1_data, self.target_shape)  # 重新采样
 
-        batch_files = t1_files[i:i + batch_size]
+        demographics_info = self.demographics_data.loc[rand_id]
+        extra_features = torch.tensor(demographics_info[['Age', 'Sex', 'TSI']].values.astype(np.float32), dtype=torch.float32)
+        label = torch.tensor(demographics_info['Lesion'], dtype=torch.float32)
 
-        for file_name in batch_files:
-            rand_id = file_name.split('_')[1]
-            t1_file = os.path.join(t1_dir, file_name)
-            lesion_file = os.path.join(lesion_dir, f"scan_{rand_id}_Lesion.nii.gz")
+        return torch.tensor(t1_data, dtype=torch.float32).unsqueeze(0), extra_features, label
 
-            if os.path.exists(lesion_file):
-                t1_data = load_nifti(t1_file)
-                lesion_data = load_nifti(lesion_file)
+def load_data(data_dir, demographics_file, batch_size=2):
+    train_t1_dir = os.path.join(data_dir, "train", "T1")
+    val_t1_dir = os.path.join(data_dir, "val", "T1")
 
-                # 归一化 T1 数据
-                t1_data = (t1_data - np.min(t1_data)) / (np.max(t1_data) - np.min(t1_data))
+    train_t1_files = [os.path.join(train_t1_dir, f) for f in os.listdir(train_t1_dir) if f.endswith(".nii.gz")]
+    val_t1_files = [os.path.join(val_t1_dir, f) for f in os.listdir(val_t1_dir) if f.endswith(".nii.gz")]
 
-                # 重新采样 T1 和病灶数据
-                t1_data = resample(t1_data, target_shape)
-                lesion_data = resample(lesion_data, target_shape)
+    train_dataset = BrainLesionDataset(train_t1_files, demographics_file)
+    val_dataset = BrainLesionDataset(val_t1_files, demographics_file)
 
-                t1_images.append(t1_data)
-                lesion_masks.append(lesion_data)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-                # 获取对应的人口统计信息
-                demographics_info = demographics_data.loc[rand_id]
-                extra_features.append(demographics_info[['Age', 'Sex', 'TSI']].values.astype(np.float32))
-
-        # 如果 batch 不为空，则转换为 numpy 数组，再转换为 PyTorch 张量，并优化数据类型
-        if t1_images:
-            t1_tensors = torch.tensor(np.array(t1_images), dtype=torch.float32).unsqueeze(1)  # (N, 1, D, H, W)
-            lesion_tensors = torch.tensor(np.array(lesion_masks), dtype=torch.float32).unsqueeze(1)  # (N, 1, D, H, W)
-            extra_features_tensors = torch.tensor(np.array(extra_features), dtype=torch.float32)  # (N, num_features)
-
-            yield t1_tensors, lesion_tensors, extra_features_tensors
+    return train_loader, val_loader

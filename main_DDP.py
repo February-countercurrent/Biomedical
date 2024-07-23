@@ -181,7 +181,7 @@ def main(rank, world_size):
     criterion = nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    batch_size = 10
+    batch_size = 1
     num_epochs = 10
 
     # 加载预先划分的数据
